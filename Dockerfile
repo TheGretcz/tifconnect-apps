@@ -24,25 +24,18 @@ RUN composer install --optimize-autoloader --no-dev --no-interaction
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Set SSL CA for Aiven MySQL
+# SSL settings for Aiven MySQL
 ENV MYSQL_ATTR_SSL_CA=/etc/ssl/certs/ca-certificates.crt
+ENV MYSQL_SSL_VERIFY=false
 
-# Create startup script using PHP built-in server (no Apache = no MPM issues)
+# Create startup script
 RUN printf '#!/bin/bash\n\
 set -e\n\
 PORT=${PORT:-8080}\n\
-echo "=== Environment Debug ==="\n\
-echo "DB_CONNECTION=$DB_CONNECTION"\n\
-echo "DB_HOST=$DB_HOST"\n\
-echo "DB_PORT=$DB_PORT"\n\
-echo "DB_DATABASE=$DB_DATABASE"\n\
-echo "DB_USERNAME=$DB_USERNAME"\n\
-echo "APP_ENV=$APP_ENV"\n\
-echo "PORT=$PORT"\n\
-echo "========================"\n\
 rm -f /var/www/html/bootstrap/cache/config.php\n\
-php artisan migrate --force 2>&1 || echo "Migration skipped (non-fatal)"\n\
-echo "Starting PHP server on port $PORT..."\n\
+echo "DB_HOST=$DB_HOST"\n\
+echo "Starting on port $PORT"\n\
+php artisan migrate --force 2>&1 || echo "Migration skipped"\n\
 exec php artisan serve --host=0.0.0.0 --port=$PORT\n' > /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
 
 CMD ["/usr/local/bin/start.sh"]
