@@ -20,6 +20,9 @@ WORKDIR /var/www/html
 # Copy project files
 COPY . .
 
+# Fix line endings for entrypoint script
+RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
+
 # Install PHP dependencies (production only)
 RUN composer install --optimize-autoloader --no-dev --no-interaction
 
@@ -31,16 +34,17 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
 RUN echo '<Directory /var/www/html/public>\n    AllowOverride All\n    Require all granted\n</Directory>' >> /etc/apache2/apache2.conf
 
-# Build assets (if node is needed, uncomment below)
-# RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-#     && apt-get install -y nodejs \
-#     && npm install && npm run build
+# Use PORT env from Railway (default 80)
+RUN echo '#!/bin/bash\n\
+PORT=${PORT:-80}\n\
+sed -i "s/Listen 80/Listen $PORT/g" /etc/apache2/ports.conf\n\
+sed -i "s/:80/:$PORT/g" /etc/apache2/sites-available/000-default.conf\n\
+php artisan config:cache || true\n\
+php artisan route:cache || true\n\
+php artisan view:cache || true\n\
+php artisan migrate --force || true\n\
+apache2-foreground' > /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
 
-# Expose port (Railway sets PORT env var)
 EXPOSE 80
 
-# Start script
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
-CMD ["docker-entrypoint.sh"]
+CMD ["/usr/local/bin/start.sh"]
