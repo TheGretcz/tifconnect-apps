@@ -1,9 +1,9 @@
 FROM php:8.3-apache
 
-# Install system dependencies
+# Install system dependencies + CA certificates
 RUN apt-get update && apt-get install -y \
     git curl zip unzip libpng-dev libjpeg-dev libfreetype6-dev \
-    libonig-dev libxml2-dev libzip-dev \
+    libonig-dev libxml2-dev libzip-dev ca-certificates \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd zip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -20,8 +20,8 @@ WORKDIR /var/www/html
 # Copy project files
 COPY . .
 
-# Fix line endings for entrypoint script
-RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
+# Fix line endings
+RUN sed -i 's/\r$//' docker-entrypoint.sh 2>/dev/null || true
 
 # Install PHP dependencies (production only)
 RUN composer install --optimize-autoloader --no-dev --no-interaction
@@ -32,18 +32,22 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 
 # Configure Apache to use Laravel public directory
 RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
-RUN echo '<Directory /var/www/html/public>\n    AllowOverride All\n    Require all granted\n</Directory>' >> /etc/apache2/apache2.conf
+RUN printf '<Directory /var/www/html/public>\n    AllowOverride All\n    Require all granted\n</Directory>\n' >> /etc/apache2/apache2.conf
 
-# Use PORT env from Railway (default 80)
-RUN echo '#!/bin/bash\n\
+# Set SSL CA for Aiven MySQL
+ENV MYSQL_ATTR_SSL_CA=/etc/ssl/certs/ca-certificates.crt
+
+# Create startup script inline (avoids CRLF issues)
+RUN printf '#!/bin/bash\n\
+set -e\n\
 PORT=${PORT:-80}\n\
-sed -i "s/Listen 80/Listen $PORT/g" /etc/apache2/ports.conf\n\
-sed -i "s/:80/:$PORT/g" /etc/apache2/sites-available/000-default.conf\n\
-php artisan config:cache || true\n\
-php artisan route:cache || true\n\
-php artisan view:cache || true\n\
-php artisan migrate --force || true\n\
-apache2-foreground' > /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
+sed -i "s/Listen 80/Listen ${PORT}/g" /etc/apache2/ports.conf\n\
+sed -i "s/:80/:${PORT}/g" /etc/apache2/sites-available/000-default.conf\n\
+php artisan config:cache 2>&1 || echo "Config cache failed, continuing..."\n\
+php artisan route:cache 2>&1 || echo "Route cache failed, continuing..."\n\
+php artisan view:cache 2>&1 || echo "View cache failed, continuing..."\n\
+php artisan migrate --force 2>&1 || echo "Migration failed, continuing..."\n\
+exec apache2-foreground\n' > /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
 
 EXPOSE 80
 
