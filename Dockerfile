@@ -1,4 +1,4 @@
-FROM php:8.3-apache
+FROM php:8.3-cli
 
 # Install system dependencies + CA certificates
 RUN apt-get update && apt-get install -y \
@@ -7,9 +7,6 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd zip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Fix Apache MPM conflict: disable mpm_event, enable mpm_prefork
-RUN a2dismod mpm_event && a2enmod mpm_prefork && a2enmod rewrite
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -27,30 +24,25 @@ RUN composer install --optimize-autoloader --no-dev --no-interaction
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Configure Apache to use Laravel public directory
-RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
-RUN printf '<Directory /var/www/html/public>\n    AllowOverride All\n    Require all granted\n</Directory>\n' >> /etc/apache2/apache2.conf
-
 # Set SSL CA for Aiven MySQL
 ENV MYSQL_ATTR_SSL_CA=/etc/ssl/certs/ca-certificates.crt
 
-# Create startup script
+# Create startup script using PHP built-in server (no Apache = no MPM issues)
 RUN printf '#!/bin/bash\n\
 set -e\n\
-PORT=${PORT:-80}\n\
-sed -i "s/Listen 80/Listen ${PORT}/g" /etc/apache2/ports.conf\n\
-sed -i "s/:80/:${PORT}/g" /etc/apache2/sites-available/000-default.conf\n\
-# Remove cached config if exists\n\
-rm -f /var/www/html/bootstrap/cache/config.php\n\
-# Debug: print DB env vars\n\
+PORT=${PORT:-8080}\n\
+echo "=== Environment Debug ==="\n\
 echo "DB_CONNECTION=$DB_CONNECTION"\n\
 echo "DB_HOST=$DB_HOST"\n\
 echo "DB_PORT=$DB_PORT"\n\
 echo "DB_DATABASE=$DB_DATABASE"\n\
-echo "Listening on port $PORT"\n\
-php artisan migrate --force 2>&1 || echo "Migration skipped"\n\
-exec apache2-foreground\n' > /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
-
-EXPOSE 80
+echo "DB_USERNAME=$DB_USERNAME"\n\
+echo "APP_ENV=$APP_ENV"\n\
+echo "PORT=$PORT"\n\
+echo "========================"\n\
+rm -f /var/www/html/bootstrap/cache/config.php\n\
+php artisan migrate --force 2>&1 || echo "Migration skipped (non-fatal)"\n\
+echo "Starting PHP server on port $PORT..."\n\
+exec php artisan serve --host=0.0.0.0 --port=$PORT\n' > /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
 
 CMD ["/usr/local/bin/start.sh"]
