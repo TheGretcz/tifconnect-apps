@@ -20,9 +20,6 @@ WORKDIR /var/www/html
 # Copy project files
 COPY . .
 
-# Fix line endings
-RUN sed -i 's/\r$//' docker-entrypoint.sh 2>/dev/null || true
-
 # Install PHP dependencies (production only)
 RUN composer install --optimize-autoloader --no-dev --no-interaction
 
@@ -37,16 +34,14 @@ RUN printf '<Directory /var/www/html/public>\n    AllowOverride All\n    Require
 # Set SSL CA for Aiven MySQL
 ENV MYSQL_ATTR_SSL_CA=/etc/ssl/certs/ca-certificates.crt
 
-# Create startup script inline (avoids CRLF issues)
+# Create startup script - NO config:cache to allow Railway env vars to work
 RUN printf '#!/bin/bash\n\
 set -e\n\
 PORT=${PORT:-80}\n\
 sed -i "s/Listen 80/Listen ${PORT}/g" /etc/apache2/ports.conf\n\
 sed -i "s/:80/:${PORT}/g" /etc/apache2/sites-available/000-default.conf\n\
-php artisan config:cache 2>&1 || echo "Config cache failed, continuing..."\n\
-php artisan route:cache 2>&1 || echo "Route cache failed, continuing..."\n\
-php artisan view:cache 2>&1 || echo "View cache failed, continuing..."\n\
-php artisan migrate --force 2>&1 || echo "Migration failed, continuing..."\n\
+php artisan config:clear 2>&1 || true\n\
+php artisan migrate --force 2>&1 || echo "Migration skipped"\n\
 exec apache2-foreground\n' > /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
 
 EXPOSE 80
