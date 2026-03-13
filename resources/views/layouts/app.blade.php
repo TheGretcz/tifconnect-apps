@@ -9,16 +9,46 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        #sidebar {
+            transition: transform 0.3s ease-in-out;
+        }
+        #main-content {
+            transition: margin-left 0.3s ease-in-out;
+        }
+        @media (min-width: 640px) {
+            .sidebar-hidden #sidebar {
+                transform: translateX(-100%) !important;
+            }
+            .sidebar-hidden #main-content {
+                margin-left: 0 !important;
+            }
+        }
+        @media (max-width: 639px) {
+            .sidebar-open #sidebar {
+                transform: translateX(0) !important;
+            }
+            .sidebar-backdrop {
+                position: fixed;
+                inset: 0;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 30;
+                display: none;
+            }
+            .sidebar-open .sidebar-backdrop {
+                display: block;
+            }
+        }
+    </style>
 </head>
 
 <body class="bg-gray-50 dark:bg-gray-900 font-sans">
     @include('components.chat-widget')
 
 
-    <button data-drawer-target="sidebar" data-drawer-toggle="sidebar" aria-controls="sidebar" type="button"
-
-        class="inline-flex items-center p-2 mt-2 ms-3 text-sm text-gray-500 rounded-lg sm:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200">
-        <span class="sr-only">Open sidebar</span>
+    <button id="sidebar-toggle" type="button"
+        class="fixed top-2 left-2 z-50 inline-flex items-center p-2 text-sm text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600">
+        <span class="sr-only">Toggle sidebar</span>
         <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
             <path clip-rule="evenodd" fill-rule="evenodd"
                 d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z">
@@ -230,7 +260,7 @@
         </div>
     </aside>
 
-    <div class="p-4 sm:ml-64">
+    <div id="main-content" class="p-4 sm:ml-64">
         <div class="p-4">
             {{-- Flash Messages --}}
             @if(session('success'))
@@ -348,6 +378,38 @@
     <!-- CHATBOT SECTION END -->
 
     @stack('scripts')
+    <div id="sidebar-overlay" class="sidebar-backdrop" onclick="document.body.classList.remove('sidebar-open')"></div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const body = document.body;
+            
+            // Check for saved state (Desktop only)
+            if (window.innerWidth >= 640 && localStorage.getItem('sidebar-collapsed') === 'true') {
+                body.classList.add('sidebar-hidden');
+            }
+
+            sidebarToggle.addEventListener('click', function() {
+                if (window.innerWidth < 640) {
+                    body.classList.toggle('sidebar-open');
+                } else {
+                    body.classList.toggle('sidebar-hidden');
+                    const isCollapsed = body.classList.contains('sidebar-hidden');
+                    localStorage.setItem('sidebar-collapsed', isCollapsed);
+                }
+            });
+
+            // Close sidebar on mobile when clicking a link
+            const sidebarLinks = document.querySelectorAll('#sidebar a');
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth < 640) {
+                        body.classList.remove('sidebar-open');
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 
 </html>
