@@ -23,6 +23,9 @@
             .sidebar-hidden #main-content {
                 margin-left: 0 !important;
             }
+            .sidebar-hidden #header-toggle {
+                margin-left: 0 !important;
+            }
         }
         @media (max-width: 639px) {
             .sidebar-open #sidebar {
@@ -32,7 +35,7 @@
                 position: fixed;
                 inset: 0;
                 background-color: rgba(0, 0, 0, 0.5);
-                z-index: 30;
+                z-index: 40;
                 display: none;
             }
             .sidebar-open .sidebar-backdrop {
@@ -46,21 +49,19 @@
     @include('components.chat-widget')
 
 
-    <button id="sidebar-toggle" type="button"
-        class="fixed top-2 left-2 z-50 inline-flex items-center p-2 text-sm text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600">
-        <span class="sr-only">Toggle sidebar</span>
-        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-            <path clip-rule="evenodd" fill-rule="evenodd"
-                d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z">
-            </path>
-        </svg>
-    </button>
+    {{-- Removed old fixed toggle --}}
 
     <aside id="sidebar"
-        class="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full sm:translate-x-0"
+        class="fixed top-0 left-0 z-50 w-64 h-screen transition-transform -translate-x-full sm:translate-x-0"
         aria-label="Sidebar">
-        <div class="h-full px-3 py-4 overflow-y-auto bg-gray-900">
-            {{-- Logo & Brand --}}
+        <div class="h-full px-3 py-4 overflow-y-auto bg-gray-900 relative">
+            {{-- Mobile Close Button --}}
+            <button type="button" onclick="document.body.classList.remove('sidebar-open')"
+                class="sm:hidden absolute top-4 right-4 text-gray-400 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
             <div class="flex items-center ps-2.5 mb-6">
                 <div
                     class="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center mr-3">
@@ -260,7 +261,24 @@
         </div>
     </aside>
 
-    <div id="main-content" class="p-4 sm:ml-64">
+    <div id="main-content" class="min-h-screen transition-all duration-300 sm:ml-64">
+        {{-- Sticky Header --}}
+        <nav class="sticky top-0 z-30 bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700 px-4 py-2.5">
+            <div class="flex items-center">
+                <button id="sidebar-toggle" type="button"
+                    class="inline-flex items-center p-2 text-sm text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600">
+                    <span class="sr-only">Toggle sidebar</span>
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                        <path clip-rule="evenodd" fill-rule="evenodd"
+                            d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z">
+                        </path>
+                    </svg>
+                </button>
+                <div class="ml-4 flex items-center lg:ml-6">
+                    <span class="text-sm font-semibold text-gray-700 dark:text-white lg:text-base">{{ $title ?? 'TIF Connect' }}</span>
+                </div>
+            </div>
+        </nav>
         <div class="p-4">
             {{-- Flash Messages --}}
             @if(session('success'))
